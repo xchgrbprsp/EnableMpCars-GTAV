@@ -9,8 +9,7 @@
 #if _DEBUG
 #define DEBUGMSG Log::Debug
 #else
-#define DEBUG_MSG2 /
-#define DEBUGMSG /DEBUG_MSG2
+#define DEBUGMSG //
 #endif
 
 class Log

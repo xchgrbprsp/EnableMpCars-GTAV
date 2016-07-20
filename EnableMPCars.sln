@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnableMPCars", "EnableMPCars\EnableMPCars.vcxproj", "{9771491E-5FD3-4EDC-A3A5-780E18E8CB13}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnableMPCars", "EnableMPCars.vcxproj", "{9771491E-5FD3-4EDC-A3A5-780E18E8CB13}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

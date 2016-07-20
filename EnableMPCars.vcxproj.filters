@@ -18,30 +18,30 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
+    <ClInclude Include="source/stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="targetver.h">
+    <ClInclude Include="source/targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Log.h">
+    <ClInclude Include="source/Log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="EnableCars.h">
+    <ClInclude Include="source/EnableCars.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="source/stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dllMain.cpp">
+    <ClCompile Include="source/dllMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Log.cpp">
+    <ClCompile Include="source/Log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="EnableCars.cpp">
+    <ClCompile Include="source/EnableCars.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -55,10 +55,11 @@ void EnableCars::FindGlobalAddress() {
 void EnableCars::FindScriptAddresses()
 {
 	if (ScriptPattern != 0) {
+		ScriptBasePointer = *(__int64*)(ScriptPattern + *(int*)(ScriptPattern + 3) + 7);
 		while ((__int64)ScriptBasePointer == 0)
 		{
-			ScriptBasePointer = *(__int64*)(ScriptPattern + *(int*)(ScriptPattern + 3) + 7);
 			Sleep(100);
+			ScriptBasePointer = *(__int64*)(ScriptPattern + *(int*)(ScriptPattern + 3) + 7);
 		}
 		DEBUGMSG("Found script base pointer %llX", ScriptBasePointer);
 	}
@@ -140,27 +141,27 @@ void EnableCars::EnableCarsGlobal()
 	int codeBlocks = CodeLength >> 14;
 	DEBUGMSG("Script Loaded, CodeLength = %d, CodeBlockCount = %d", CodeLength, codeBlocks);
 	__int64* CodeBlockOffset = *(__int64**)(scriptBaseAddress + 0x10);
-	for (int i = 0; i<codeBlocks;i++)
+	for (int i = 0; i < codeBlocks; i++)
 	{
 		//__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03\x55\x00\x00\x28\xF0\x91\xDE\xBC", "xxxxxxxx??xxxxx", (const char*)(*(CodeBlockOffset + i)), (size_t)0x4000);
-		__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03", "xxxxxxx", (const char*)(*(CodeBlockOffset + i)), (size_t)0x4000);
+		__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03", "xxxxxxx", (const char*)(*(CodeBlockOffset + i)), 0x4000);
 		if (!sigAddress)
 		{
 			continue;
 		}
 		DEBUGMSG("Pattern found in codepage %d at memory address %llX", i, sigAddress);
 		int RealCodeOff = (int)(sigAddress - *(CodeBlockOffset + i) + (i << 14));
-		for (int j = 0; j<400;j++)
+		for (int j = 0; j < 400; j++)
 		{
 			if (*(int*)(GetScriptAddress(CodeBlockOffset, RealCodeOff - j)) == 0x0008012D)
 			{
 				int funcOff = *(int*)GetScriptAddress(CodeBlockOffset, RealCodeOff - j + 6) & 0xFFFFFF;
 				DEBUGMSG("found function codepage address at %x", funcOff);
-				for (int k = 0x5;k<0x40;k++)
+				for (int k = 0x5; k < 0x40; k++)
 				{
 					if ((*(int*)GetScriptAddress(CodeBlockOffset, funcOff + k) & 0xFFFFFF) == 0x01002E)
 					{
-						for (k = k+1; k<30;k++)
+						for (k = k + 1; k < 30; k++)
 						{
 							if (*(unsigned char*)GetScriptAddress(CodeBlockOffset, funcOff + k) == 0x5F)
 							{
@@ -169,16 +170,17 @@ void EnableCars::EnableCarsGlobal()
 								Log::Msg("Setting Global Variable %d to true", globalindex);
 								*getGlobalAddress(globalindex) = 1;
 								Log::Msg("MP Cars enabled");
-								FindSwitch(CodeBlockOffset, RealCodeOff - j);
+								FindSwitch(CodeBlockOffset, RealCodeOff - j);//not essential, just for printing affected cars
 								return;
 							}
 						}
-						
+						break;
 					}
 				}
-				
+				break;
 			}
 		}
+		break;
 	}
 	Log::Msg("Global Variable not found, check game version >= 1.0.678.1");
 }

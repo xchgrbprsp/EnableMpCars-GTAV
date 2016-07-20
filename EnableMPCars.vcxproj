@@ -45,10 +45,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.asi</TargetExt>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>obj\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.asi</TargetExt>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>obj\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -87,16 +91,16 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EnableCars.h" />
-    <ClInclude Include="Log.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="source/EnableCars.h" />
+    <ClInclude Include="source/Log.h" />
+    <ClInclude Include="source/stdafx.h" />
+    <ClInclude Include="source/targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="dllMain.cpp" />
-    <ClCompile Include="EnableCars.cpp" />
-    <ClCompile Include="Log.cpp" />
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="source/dllMain.cpp" />
+    <ClCompile Include="source/EnableCars.cpp" />
+    <ClCompile Include="source/Log.cpp" />
+    <ClCompile Include="source/stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
