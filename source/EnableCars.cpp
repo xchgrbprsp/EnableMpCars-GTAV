@@ -1,17 +1,52 @@
 #include "stdafx.h"
 #include <Psapi.h>
-
+#include <vector>
+struct HashPair
+{
+	int modelHash;
+	int DispHash;
+};
 __int64** GlobalBasePointer;
 __int64 ScriptBasePointer;
 __int64 GlobalPattern;
 __int64 ScriptPattern;
-__int64 *scriptAddress;
-int hash = 0x39DA738B;
+__int64 *shopControllerAddress;
+__int64 *cheatControllerAddress;
 int displayNameOffset;
 HINSTANCE _hinstDLL;
-
+std::vector<HashPair> CarHashes;
 __int64(*GetModelInfo)(int, __int64);
-uintptr_t EnableCars::FindPattern(const char *pattern, const char *mask, const char* startAddress, size_t size)
+/*dont even bother trying to understand this
+What it evaluates to is
+void SpawnCarCheck(Hash modelHash, Hash displayHash)
+{
+	Vehicle Temp;
+	if (GAMEPLAY::_HAS_CHEAT_STRING_JUST_BEEN_ENTERED(displayHash))
+	{
+		if (STREAMING::IS_MODEL_IN_CD_IMAGE(modelHash))
+		{
+			while(!STREAMING::HAS_MODEL_LOADED(modelHash))
+			{
+				STREAMING::REQUEST_MODEL(modelHash);
+				SYSTEM::WAIT(0);
+			}
+			Temp = PED::GET_VEHICLE_PED_IS_USING(PLAYER::PLAYER_PED_ID());
+			if (ENTITY::DOES_ENTITY_EXIST(Temp))
+			{
+				VEHICLE::DELETE(&Temp);
+			}
+			Temp = VEHICLE::CREATE_VEHICLE(modelHash, ENTITY::GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(PED::PLAYER_PED_ID(), 0.0f, 4.0f, 1.0f), ENTITY::GET_ENTITY_HEADING(PLAYER::PLAYER_PED_ID()) + 90f, 0, 1);
+			VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(Temp);
+			STREAMING::SET_MODEL_AS_NO_LONGER_NEEDED(modelHash);
+			VEHICLE::SET_VEHICLE_AS_NO_LONGER_NEEDED(Temp);
+		}
+	}
+}
+*/
+const char *Function = "\x2D\x02\x03\x00\x00\x38\x01\x2C\x05\x00\x1C\x56\x70\x00\x38\x00\x2C\x05\x00\x44\x56\x67\x00\x38\x00\x2C\x05\x00\x25\x06\x56\x0E\x00\x38\x00\x2C\x04\x00\x3D\x6E\x2C\x04\x00\x81\x55\xE8\xFF\x2C\x01\x00\x8F\x2C\x05\x00\x4B\x39\x04\x38\x04\x2C\x05\x00\x83\x56\x06\x00\x37\x04\x2C\x04\x00\x70\x38\x00\x2C\x01\x00\x8F\x77\x7B\x78\x2C\x13\x00\x2A\x2C\x01\x00\x8F\x2C\x05\x00\x4C\x29\x00\x00\xB4\x42\x0E\x6E\x6F\x2C\x1D\x00\x37\x39\x04\x38\x04\x2C\x05\x00\x65\x2B\x38\x00\x2C\x04\x00\x13\x37\x04\x2C\x04\x00\x0A\x2E\x02\x00";
+int(*GetHashKey)(char*, unsigned int);
+
+uintptr_t FindPattern(const char *pattern, const char *mask, const char* startAddress, size_t size)
 {
 	const char* address_end = startAddress + size;
 	const auto mask_length = static_cast<size_t>(strlen(mask) - 1);
@@ -36,7 +71,7 @@ uintptr_t EnableCars::FindPattern(const char *pattern, const char *mask, const c
 	return 0;
 }
 
-uintptr_t EnableCars::FindPattern(const char *pattern, const char *mask)
+uintptr_t FindPattern(const char *pattern, const char *mask)
 {
 	MODULEINFO module = {};
 	GetModuleInformation(GetCurrentProcess(), GetModuleHandle(nullptr), &module, sizeof(MODULEINFO));
@@ -77,16 +112,18 @@ void EnableCars::FindPatterns()
 	__int64 CarDisplayNamePattern = FindPattern("\x80\xF9\x05\x75\x08\x48\x05\x00\x00\x00\x00", "xxxxxxx????");
 	GetModelInfo = (__int64(*)(int, __int64))(*(int*)(CarDisplayNamePattern - 0x12) + CarDisplayNamePattern - 0x12 + 0x4);
 	displayNameOffset = *(int*)(CarDisplayNamePattern + 0x7);
+	__int64 getHashKeyPattern = FindPattern("\x48\x8B\x0B\x33\xD2\xE8\x00\x00\x00\x00\x89\x03", "xxxxxx????xx");
+	GetHashKey = reinterpret_cast<int(*)(char*, unsigned int)>(*reinterpret_cast<int*>(getHashKeyPattern + 6) + getHashKeyPattern + 10);
 
 	if (!GlobalPattern)
 	{
-		Log::Msg("ERROR: Couldnt find Global address");
+		Log::Msg("ERROR: finding address 0");
 		Log::Msg("Aborting...");
 		FreeLibraryAndExitThread(_hinstDLL, 0);
 	}
 	if (!ScriptPattern)
 	{
-		Log::Msg("ERROR: Couldnt find script table address");
+		Log::Msg("ERROR: finding address 1");
 		Log::Msg("Aborting...");
 		FreeLibraryAndExitThread(_hinstDLL, 0);
 	}
@@ -101,6 +138,7 @@ void EnableCars::Run(HINSTANCE hinstDLL)
 	FindGlobalAddress();
 	FindScriptAddresses();
 	FindShopController();
+	FindCheatController();
 	EnableCarsGlobal();
 	FreeLibraryAndExitThread(_hinstDLL, 0);
 }
@@ -109,25 +147,50 @@ void EnableCars::FindShopController()
 {
 	for (int i = 0; i < 1000; i++)
 	{
-		if (*(int*)(ScriptBasePointer + (i << 4) + 12) == hash)
+		if (*(int*)(ScriptBasePointer + (i << 4) + 12) == 0x39DA738B)
 		{
-			scriptAddress = (__int64*)(ScriptBasePointer + (i << 4));
-			if (!*scriptAddress)
+			shopControllerAddress = (__int64*)(ScriptBasePointer + (i << 4));
+			if (!*shopControllerAddress)
 			{
-				DEBUGMSG("script not loaded, waiting...");
+				DEBUGMSG("shop controller script not loaded, waiting...");
 			}
-			while (!*scriptAddress)
+			while (!*shopControllerAddress)
 			{
 				Sleep(100);
 			}
-			DEBUGMSG("Shop Controller script loaded, Address = %llX", *scriptAddress);
+			DEBUGMSG("Shop Controller script loaded, Address = %llX", *shopControllerAddress);
 			return;
 		}
 	}
-	Log::Msg("ERROR: Couldnt find script address");
+	Log::Msg("ERROR: finding address 2");
 	Log::Msg("Aborting...");
 	FreeLibraryAndExitThread(_hinstDLL, 0);
 }
+
+void EnableCars::FindCheatController()
+{
+	for (int i = 0; i < 1000; i++)
+	{
+		if (*(int*)(ScriptBasePointer + (i << 4) + 12) == 0xAFD9916D)
+		{
+			cheatControllerAddress = (__int64*)(ScriptBasePointer + (i << 4));
+			if (!*cheatControllerAddress)
+			{
+				DEBUGMSG("cheat controller script not loaded, waiting...");
+			}
+			while (!*cheatControllerAddress)
+			{
+				Sleep(100);
+			}
+			DEBUGMSG("Cheat Controller script loaded, Address = %llX", *cheatControllerAddress);
+			return;
+		}
+	}
+	Log::Msg("ERROR: finding address 3");
+	Log::Msg("Aborting...");
+	FreeLibraryAndExitThread(_hinstDLL, 0);
+}
+
 
 __int64 EnableCars::GetScriptAddress(__int64* codeBlocksOff, int offset)
 {
@@ -136,14 +199,13 @@ __int64 EnableCars::GetScriptAddress(__int64* codeBlocksOff, int offset)
 
 void EnableCars::EnableCarsGlobal()
 {
-	__int64 scriptBaseAddress = *scriptAddress;
+	__int64 scriptBaseAddress = *shopControllerAddress;
 	int CodeLength = *(int*)(scriptBaseAddress + 0x1C);
 	int codeBlocks = CodeLength >> 14;
 	DEBUGMSG("Script Loaded, CodeLength = %d, CodeBlockCount = %d", CodeLength, codeBlocks);
 	__int64* CodeBlockOffset = *(__int64**)(scriptBaseAddress + 0x10);
 	for (int i = 0; i < codeBlocks; i++)
 	{
-		//__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03\x55\x00\x00\x28\xF0\x91\xDE\xBC", "xxxxxxxx??xxxxx", (const char*)(*(CodeBlockOffset + i)), (size_t)0x4000);
 		__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03", "xxxxxxx", (const char*)(*(CodeBlockOffset + i)), 0x4000);
 		if (!sigAddress)
 		{
@@ -170,7 +232,8 @@ void EnableCars::EnableCarsGlobal()
 								Log::Msg("Setting Global Variable %d to true", globalindex);
 								*getGlobalAddress(globalindex) = 1;
 								Log::Msg("MP Cars enabled");
-								FindSwitch(CodeBlockOffset, RealCodeOff - j);//not essential, just for printing affected cars
+								FindSwitch(CodeBlockOffset, RealCodeOff - j);
+								PatchCheatController();
 								return;
 							}
 						}
@@ -219,26 +282,21 @@ void EnableCars::FindAffectedCars(__int64* codeBlockOffset, int scriptSwitchOffs
 			hash = *(int*)(caseOff + 1) & 0xFFFFFF;
 		}else
 		{
-			Log::Msg("Error with car hash %X", *(int*)(caseOff + 1));// in reality this should never be executes
+			Log::Msg("Error with car hash %X", *(int*)(caseOff + 1));// in reality this should never be executed
 			continue;
 		}
-		Log::Msg("Found affected hash: 0x%X - DisplayName = %s", hash, GetDisplayName(hash));
+		char* displayName = GetDisplayName(hash);
+		Log::Msg("Found affected hash: 0x%08X - DisplayName = %s", hash, displayName);
+		HashPair h;
+		h.DispHash = GetHashKey(displayName, 0);
+		h.modelHash = hash;
+		CarHashes.push_back(h);
 	}
 }
-#ifdef _DEBUG
-bool one = false;
-#endif
 char* EnableCars::GetDisplayName(int modelHash)
 {
 	int data = 0xFFFF;
 	__int64 addr = GetModelInfo(modelHash, (__int64)&data);
-#ifdef _DEBUG
-	if (!one)
-	{
-		one = true;
-		DEBUGMSG("DEBUG Address = %llX", addr);
-	}
-#endif
 	if (addr && (*(unsigned char*)(addr + 157) & 0x1F) == 5)
 	{
 		return (char*)(addr + displayNameOffset);
@@ -249,4 +307,64 @@ char* EnableCars::GetDisplayName(int modelHash)
 	}
 }
 
+void EnableCars::PatchCheatController()
+{
+	if (CarHashes.size() == 0)
+	{
+		return;//no car hashes found
+	}
+	Log::Msg("Applying patch to enable car spawning");
+	__int64 scriptBaseAddress = *cheatControllerAddress;
+	int *CodeLengthPtr = (int*)(scriptBaseAddress + 0x1C);
+	int staticCount = *(int*)(scriptBaseAddress + 0x24);
+	__int64 staticOff = *(__int64*)(scriptBaseAddress + 0x30);
+	__int64 StartOff = (staticOff + staticCount * 8 + 15) & 0xFFFFFFFFFFFFFF00;
+	DEBUGMSG("Cheat controller Loaded, CodeLength = %d", *CodeLengthPtr);
+	__int64* CodeBlockOffset = *(__int64**)(scriptBaseAddress + 0x10);
+	
+	int *setOffset = NULL;
+	for (int i = 0; i < *CodeLengthPtr;i++)
+	{
+		if (*(__int64*)GetScriptAddress(CodeBlockOffset, i) == 0x3C6E5C3C6E00002E)
+		{
+			setOffset = (int*)GetScriptAddress(CodeBlockOffset, i + 3);
+			DEBUGMSG("Found cheat controller hook offset: %X", setOffset);
+			break;
+		}
+	}
+	if (!setOffset)
+	{
+		Log::Msg("Error applying patch, car spawning disabled");
+		return;
+	}
+	DEBUGMSG("Extending code table");
+	CodeBlockOffset[1] = (__int64)StartOff;
+	*CodeLengthPtr = 0x408E + 0x14 * (int)CarHashes.size();
+	DEBUGMSG("CodeTable Length = %X", *CodeLengthPtr);
+	DEBUGMSG("Starting offset = %llX", StartOff);
+	memcpy((void*)StartOff, (void*)Function, 129);//function takes model hash and display hash, returns void
+	DEBUGMSG("Copied new function");
+	unsigned char* cur = (unsigned char*)((__int64)StartOff + 129);
+	memcpy((void*)cur, (void*)"\x2D\x00\x02\x00\x00", 5);//function for adding the new cheats and fixing patch, no params, no returns
+	cur += 5;
+	memcpy((void*)cur, setOffset, 6);//copy the code for setting the locals used to hook this function
+	cur += 6;
+	for (int i = 0, max = CarHashes.size(); i<max;i++)
+	{
+		*cur++ = 0x28;
+		*(int*)cur = CarHashes[i].modelHash;//push model hash
+		cur += 4;
+		*cur++ = 0x28;
+		*(int*)cur = CarHashes[i].DispHash;//push display hash
+		cur += 4;
+		*(int*)cur = 0x0040005D;//call our new function for checking if cheat entered, then spawning car
+		cur += 4;
+	}
+	
+	*(int*)cur = 0x0000002E;//return statement
 
+	DEBUGMSG("Patching new function"); //0x0040805D
+	memcpy((void*)setOffset, (void*)"\x5D\x80\x40\x00\x00\x00", 6);
+	Log::Msg("Success, spawn the cars using their display name as a cheatcode (press ` in game)");
+	
+}
