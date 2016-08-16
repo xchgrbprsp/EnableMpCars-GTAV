@@ -1,20 +1,22 @@
 #include "stdafx.h"
 #include <Psapi.h>
 #include <vector>
+#include "Structs.h"
 struct HashPair
 {
 	int modelHash;
 	int DispHash;
 };
-__int64** GlobalBasePointer;
-__int64 ScriptBasePointer;
-__int64 GlobalPattern;
-__int64 ScriptPattern;
-__int64 *shopControllerAddress;
-__int64 *cheatControllerAddress;
+std::vector<HashPair> CarHashes;
+
+
+ScriptTable* scriptTable;
+GlobalTable globalTable;
+ScriptHeader* cheatController;
+ScriptHeader* shopController;
+
 int displayNameOffset;
 HINSTANCE _hinstDLL;
-std::vector<HashPair> CarHashes;
 __int64(*GetModelInfo)(int, __int64);
 /*dont even bother trying to understand this
 What it evaluates to is
@@ -79,54 +81,71 @@ uintptr_t FindPattern(const char *pattern, const char *mask)
 	return FindPattern(pattern, mask, reinterpret_cast<const char *>(module.lpBaseOfDll), module.SizeOfImage);
 }
 
-void EnableCars::FindGlobalAddress() {
-	if (GlobalPattern != 0) {
-		GlobalBasePointer = (__int64**)(GlobalPattern + *(int*)(GlobalPattern + 3) + 7);
-		while (!*GlobalBasePointer)Sleep(100);//Wait for GlobalInitialisation before continuing
-		DEBUGMSG("Found global base pointer %llX", (__int64)GlobalBasePointer);
-	}
-}
-
 void EnableCars::FindScriptAddresses()
 {
-	if (ScriptPattern != 0) {
-		ScriptBasePointer = *(__int64*)(ScriptPattern + *(int*)(ScriptPattern + 3) + 7);
-		while ((__int64)ScriptBasePointer == 0)
-		{
-			Sleep(100);
-			ScriptBasePointer = *(__int64*)(ScriptPattern + *(int*)(ScriptPattern + 3) + 7);
-		}
-		DEBUGMSG("Found script base pointer %llX", ScriptBasePointer);
+
+	while(*(__int64*)scriptTable == 0)
+	{
+		Sleep(100);
 	}
-}
+	DEBUGMSG("Found script base pointer %llX", (__int64)scriptTable);
+	ScriptTableItem* Item = scriptTable->FindScript(0x39DA738B);
+	if(Item == NULL)
+	{
+		Log::Msg("ERROR: finding address 2");
+		Log::Msg("Aborting...");
+		FreeLibraryAndExitThread(_hinstDLL, 0);
+	}
+	while(!Item->IsLoaded())
+	{
+		Sleep(100);
+	}
+	shopController = Item->Header;
 
-
-__int64 *EnableCars::getGlobalAddress(int index) {
-	return &GlobalBasePointer[index >> 18][index & 0x3FFFF];
+	Item = scriptTable->FindScript(0xAFD9916D);
+	if(Item == NULL)
+	{
+		Log::Msg("ERROR: finding address 3");
+		Log::Msg("Aborting...");
+		FreeLibraryAndExitThread(_hinstDLL, 0);
+	}
+	while(!Item->IsLoaded())
+	{
+		Sleep(100);
+	}
+	cheatController = Item->Header;
 }
 
 void EnableCars::FindPatterns()
 {
-	GlobalPattern = FindPattern("\x4C\x8D\x05\x00\x00\x00\x00\x4D\x8B\x08\x4D\x85\xC9\x74\x11", "xxx????xxxxxxxx");
-	ScriptPattern = FindPattern("\x48\x03\x15\x00\x00\x00\x00\x4C\x23\xC2\x49\x8B\x08", "xxx????xxxxxx");
-	__int64 CarDisplayNamePattern = FindPattern("\x80\xF9\x05\x75\x08\x48\x05\x00\x00\x00\x00", "xxxxxxx????");
-	GetModelInfo = (__int64(*)(int, __int64))(*(int*)(CarDisplayNamePattern - 0x12) + CarDisplayNamePattern - 0x12 + 0x4);
-	displayNameOffset = *(int*)(CarDisplayNamePattern + 0x7);
-	__int64 getHashKeyPattern = FindPattern("\x48\x8B\x0B\x33\xD2\xE8\x00\x00\x00\x00\x89\x03", "xxxxxx????xx");
-	GetHashKey = reinterpret_cast<int(*)(char*, unsigned int)>(*reinterpret_cast<int*>(getHashKeyPattern + 6) + getHashKeyPattern + 10);
-
-	if (!GlobalPattern)
+	__int64 patternAddr = FindPattern("\x4C\x8D\x05\x00\x00\x00\x00\x4D\x8B\x08\x4D\x85\xC9\x74\x11", "xxx????xxxxxxxx");
+	if(!patternAddr)
 	{
 		Log::Msg("ERROR: finding address 0");
 		Log::Msg("Aborting...");
 		FreeLibraryAndExitThread(_hinstDLL, 0);
 	}
-	if (!ScriptPattern)
+	globalTable.GlobalBasePtr = (__int64**)(patternAddr + *(int*)(patternAddr + 3) + 7);
+
+
+	patternAddr = FindPattern("\x48\x03\x15\x00\x00\x00\x00\x4C\x23\xC2\x49\x8B\x08", "xxx????xxxxxx");
+	if(!patternAddr)
 	{
 		Log::Msg("ERROR: finding address 1");
 		Log::Msg("Aborting...");
 		FreeLibraryAndExitThread(_hinstDLL, 0);
 	}
+	scriptTable = (ScriptTable*)(patternAddr + *(int*)(patternAddr + 3) + 7);
+
+
+	patternAddr = FindPattern("\x80\xF9\x05\x75\x08\x48\x05\x00\x00\x00\x00", "xxxxxxx????");
+	GetModelInfo = (__int64(*)(int, __int64))(*(int*)(patternAddr - 0x12) + patternAddr - 0x12 + 0x4);
+	displayNameOffset = *(int*)(patternAddr + 0x7);
+	__int64 getHashKeyPattern = FindPattern("\x48\x8B\x0B\x33\xD2\xE8\x00\x00\x00\x00\x89\x03", "xxxxxx????xx");
+	GetHashKey = reinterpret_cast<int(*)(char*, unsigned int)>(*reinterpret_cast<int*>(getHashKeyPattern + 6) + getHashKeyPattern + 10);
+
+	while(!globalTable.IsInitialised())Sleep(100);//Wait for GlobalInitialisation before continuing
+	DEBUGMSG("Found global base pointer %llX", (__int64)globalTable.GlobalBasePtr);	
 }
 
 
@@ -135,104 +154,43 @@ void EnableCars::Run(HINSTANCE hinstDLL)
 	_hinstDLL = hinstDLL;
 	Log::Init(hinstDLL);
 	FindPatterns();
-	FindGlobalAddress();
 	FindScriptAddresses();
-	FindShopController();
-	FindCheatController();
 	EnableCarsGlobal();
 	FreeLibraryAndExitThread(_hinstDLL, 0);
 }
 
-void EnableCars::FindShopController()
-{
-	for (int i = 0; i < 1000; i++)
-	{
-		if (*(int*)(ScriptBasePointer + (i << 4) + 12) == 0x39DA738B)
-		{
-			shopControllerAddress = (__int64*)(ScriptBasePointer + (i << 4));
-			if (!*shopControllerAddress)
-			{
-				DEBUGMSG("shop controller script not loaded, waiting...");
-			}
-			while (!*shopControllerAddress)
-			{
-				Sleep(100);
-			}
-			DEBUGMSG("Shop Controller script loaded, Address = %llX", *shopControllerAddress);
-			return;
-		}
-	}
-	Log::Msg("ERROR: finding address 2");
-	Log::Msg("Aborting...");
-	FreeLibraryAndExitThread(_hinstDLL, 0);
-}
-
-void EnableCars::FindCheatController()
-{
-	for (int i = 0; i < 1000; i++)
-	{
-		if (*(int*)(ScriptBasePointer + (i << 4) + 12) == 0xAFD9916D)
-		{
-			cheatControllerAddress = (__int64*)(ScriptBasePointer + (i << 4));
-			if (!*cheatControllerAddress)
-			{
-				DEBUGMSG("cheat controller script not loaded, waiting...");
-			}
-			while (!*cheatControllerAddress)
-			{
-				Sleep(100);
-			}
-			DEBUGMSG("Cheat Controller script loaded, Address = %llX", *cheatControllerAddress);
-			return;
-		}
-	}
-	Log::Msg("ERROR: finding address 3");
-	Log::Msg("Aborting...");
-	FreeLibraryAndExitThread(_hinstDLL, 0);
-}
-
-
-__int64 EnableCars::GetScriptAddress(__int64* codeBlocksOff, int offset)
-{
-	return *(codeBlocksOff + (offset >> 14)) + (offset & 0x3FFF);
-}
 
 void EnableCars::EnableCarsGlobal()
 {
-	__int64 scriptBaseAddress = *shopControllerAddress;
-	int CodeLength = *(int*)(scriptBaseAddress + 0x1C);
-	int codeBlocks = CodeLength >> 14;
-	DEBUGMSG("Script Loaded, CodeLength = %d, CodeBlockCount = %d", CodeLength, codeBlocks);
-	__int64* CodeBlockOffset = *(__int64**)(scriptBaseAddress + 0x10);
-	for (int i = 0; i < codeBlocks; i++)
+	for (int i = 0; i < shopController->CodePageCount(); i++)
 	{
-		__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03", "xxxxxxx", (const char*)(*(CodeBlockOffset + i)), 0x4000);
+		__int64 sigAddress = FindPattern("\x28\x26\xCE\x6B\x86\x39\x03", "xxxxxxx", (const char*)shopController->GetCodePageAddress(i), shopController->GetCodePageSize(i));
 		if (!sigAddress)
 		{
 			continue;
 		}
-		DEBUGMSG("Pattern found in codepage %d at memory address %llX", i, sigAddress);
-		int RealCodeOff = (int)(sigAddress - *(CodeBlockOffset + i) + (i << 14));
+		DEBUGMSG("Pattern Found in codepage %d at memory address %llX", i, sigAddress);
+		int RealCodeOff = (int)(sigAddress - (__int64)shopController->GetCodePageAddress(i) + (i << 14));
 		for (int j = 0; j < 400; j++)
 		{
-			if (*(int*)(GetScriptAddress(CodeBlockOffset, RealCodeOff - j)) == 0x0008012D)
+			if (*(int*)shopController->GetCodePositionAddress(RealCodeOff - j) == 0x0008012D)
 			{
-				int funcOff = *(int*)GetScriptAddress(CodeBlockOffset, RealCodeOff - j + 6) & 0xFFFFFF;
-				DEBUGMSG("found function codepage address at %x", funcOff);
+				int funcOff = *(int*)shopController->GetCodePositionAddress(RealCodeOff - j + 6) & 0xFFFFFF;
+				DEBUGMSG("found Function codepage address at %x", funcOff);
 				for (int k = 0x5; k < 0x40; k++)
 				{
-					if ((*(int*)GetScriptAddress(CodeBlockOffset, funcOff + k) & 0xFFFFFF) == 0x01002E)
+					if ((*(int*)shopController->GetCodePositionAddress(funcOff + k) & 0xFFFFFF) == 0x01002E)
 					{
 						for (k = k + 1; k < 30; k++)
 						{
-							if (*(unsigned char*)GetScriptAddress(CodeBlockOffset, funcOff + k) == 0x5F)
+							if (*(unsigned char*)shopController->GetCodePositionAddress(funcOff + k) == 0x5F)
 							{
-								int globalindex = *(int*)GetScriptAddress(CodeBlockOffset, funcOff + k + 1) & 0xFFFFFF;
-								DEBUGMSG("Found Global Variable %d, address = %llX", globalindex, (__int64)getGlobalAddress(globalindex));
+								int globalindex = *(int*)shopController->GetCodePositionAddress(funcOff + k + 1) & 0xFFFFFF;
+								DEBUGMSG("Found Global Variable %d, address = %llX", globalindex, (__int64)globalTable.AddressOf(globalindex));
 								Log::Msg("Setting Global Variable %d to true", globalindex);
-								*getGlobalAddress(globalindex) = 1;
+								*globalTable.AddressOf(globalindex) = 1;
 								Log::Msg("MP Cars enabled");
-								FindSwitch(CodeBlockOffset, RealCodeOff - j);
+								FindSwitch(RealCodeOff - j);
 								PatchCheatController();
 								return;
 							}
@@ -248,22 +206,22 @@ void EnableCars::EnableCarsGlobal()
 	Log::Msg("Global Variable not found, check game version >= 1.0.678.1");
 }
 
-void EnableCars::FindSwitch(__int64* codeBlockOffset, int funcCallOffset)
+void EnableCars::FindSwitch(int funcCallOffset)
 {
 	for (int i = 14; i<400;i++)
 	{
-		if (*(unsigned char*)GetScriptAddress(codeBlockOffset, funcCallOffset + i) == 0x62)
+		if (*(unsigned char*)shopController->GetCodePositionAddress(funcCallOffset + i) == 0x62)
 		{
-			FindAffectedCars(codeBlockOffset, funcCallOffset + i);
+			FindAffectedCars(funcCallOffset + i);
 			return;
 		}
 	}
 	Log::Msg("Couldnt find affected cars");
 }
 
-void EnableCars::FindAffectedCars(__int64* codeBlockOffset, int scriptSwitchOffset)
+void EnableCars::FindAffectedCars(int scriptSwitchOffset)
 {
-	__int64 curAddress = (__int64)GetScriptAddress(codeBlockOffset, scriptSwitchOffset + 2);
+	__int64 curAddress = (__int64)shopController->GetCodePositionAddress(scriptSwitchOffset + 2);
 	int startOff = scriptSwitchOffset + 2;
 	int cases = *(unsigned char*)(curAddress - 1);
 	for (int i = 0; i<cases;i++)
@@ -271,7 +229,7 @@ void EnableCars::FindAffectedCars(__int64* codeBlockOffset, int scriptSwitchOffs
 		curAddress += 6;
 		startOff += 6;
 		int jumpoff = *(short*)(curAddress - 2);
-		__int64 caseOff = GetScriptAddress(codeBlockOffset, startOff + jumpoff);
+		__int64 caseOff = (__int64)shopController->GetCodePositionAddress(startOff + jumpoff);
 		unsigned char opCode = *(unsigned char*)caseOff;
 		int hash;
 		if (opCode == 0x28)//push int
@@ -314,20 +272,15 @@ void EnableCars::PatchCheatController()
 		return;//no car hashes found
 	}
 	Log::Msg("Applying patch to enable car spawning");
-	__int64 scriptBaseAddress = *cheatControllerAddress;
-	int *CodeLengthPtr = (int*)(scriptBaseAddress + 0x1C);
-	int staticCount = *(int*)(scriptBaseAddress + 0x24);
-	__int64 staticOff = *(__int64*)(scriptBaseAddress + 0x30);
-	__int64 StartOff = (staticOff + staticCount * 8 + 15) & 0xFFFFFFFFFFFFFF00;
-	DEBUGMSG("Cheat controller Loaded, CodeLength = %d", *CodeLengthPtr);
-	__int64* CodeBlockOffset = *(__int64**)(scriptBaseAddress + 0x10);
+	__int64 StartOff = ((__int64)(cheatController->localOffset + cheatController->localCount)+ 15) & 0xFFFFFFFFFFFFFFF0;
+	DEBUGMSG("Cheat controller Loaded, CodeLength = %d", cheatController->codeLength);
 	
 	int *setOffset = NULL;
-	for (int i = 0; i < *CodeLengthPtr;i++)
+	for (int i = 0; i < cheatController->codeLength;i++)
 	{
-		if (*(__int64*)GetScriptAddress(CodeBlockOffset, i) == 0x3C6E5C3C6E00002E)
+		if (*(__int64*)cheatController->GetCodePositionAddress(i) == 0x3C6E5C3C6E00002E)
 		{
-			setOffset = (int*)GetScriptAddress(CodeBlockOffset, i + 3);
+			setOffset = (int*)cheatController->GetCodePositionAddress(i + 3);
 			DEBUGMSG("Found cheat controller hook offset: %X", setOffset);
 			break;
 		}
@@ -338,9 +291,9 @@ void EnableCars::PatchCheatController()
 		return;
 	}
 	DEBUGMSG("Extending code table");
-	CodeBlockOffset[1] = (__int64)StartOff;
-	*CodeLengthPtr = 0x408E + 0x14 * (int)CarHashes.size();
-	DEBUGMSG("CodeTable Length = %X", *CodeLengthPtr);
+	cheatController->codeBlocksOffset[1] = (unsigned char*)StartOff;
+	cheatController->codeLength = 0x408E + 0x14 * (int)CarHashes.size();
+	DEBUGMSG("CodeTable Length = %X", cheatController->codeLength);
 	DEBUGMSG("Starting offset = %llX", StartOff);
 	memcpy((void*)StartOff, (void*)Function, 129);//function takes model hash and display hash, returns void
 	DEBUGMSG("Copied new function");

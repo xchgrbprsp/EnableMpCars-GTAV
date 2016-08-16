@@ -91,6 +91,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="source\Structs.h" />
     <ClInclude Include="source/EnableCars.h" />
     <ClInclude Include="source/Log.h" />
     <ClInclude Include="source/stdafx.h" />
