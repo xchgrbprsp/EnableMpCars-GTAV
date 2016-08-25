@@ -23,18 +23,18 @@ struct ScriptHeader
 	char padding8[12];					//0x74
 	//END_OF_HEADER
 
-	inline bool IsValid() const { return codeLength > 0; }
-	inline int CodePageCount() const { return (codeLength + 0x3FFF) >> 14; }
-	inline int GetCodePageSize(int page) const
+	bool IsValid() const { return codeLength > 0; }
+	int CodePageCount() const { return (codeLength + 0x3FFF) >> 14; }
+	int GetCodePageSize(int page) const
 	{
 		return (page < 0 || page >= CodePageCount() ? 0 : (page == CodePageCount() - 1) ? codeLength & 0x3FFF : 0x4000);
 	}
-	inline unsigned char* GetCodePageAddress(int page) const{ return codeBlocksOffset[page]; }
-	inline unsigned char* GetCodePositionAddress(int codePosition) const
+	unsigned char* GetCodePageAddress(int page) const{ return codeBlocksOffset[page]; }
+	unsigned char* GetCodePositionAddress(int codePosition) const
 	{
 		return codePosition < 0 || codePosition >= codeLength ? NULL : &codeBlocksOffset[codePosition >> 14][codePosition & 0x3FFF];
 	}
-	inline char* GetString(int stringPosition)const
+	char* GetString(int stringPosition)const
 	{
 		return stringPosition < 0 || stringPosition >= stringSize ? NULL : &stringsOffset[stringPosition >> 14][stringPosition & 0x3FFF];
 	}
@@ -42,7 +42,6 @@ struct ScriptHeader
 };
 struct ScriptTableItem
 {
-public:
 	ScriptHeader* Header;
 	char padding[4];
 	int hash;
@@ -58,8 +57,6 @@ struct ScriptTable
 	ScriptTableItem* TablePtr;
 	char padding[16];
 	int count;
-
-public:
 	ScriptTableItem* FindScript(int hash)
 	{
 		if (TablePtr == NULL)
@@ -80,6 +77,6 @@ public:
 struct GlobalTable
 {
 	__int64** GlobalBasePtr;
-	inline __int64* AddressOf(int index) const{	return &GlobalBasePtr[index >> 18][index & 0x3FFFF];}
-	inline bool IsInitialised()const{ return *GlobalBasePtr != NULL; }
+	__int64* AddressOf(int index) const{ return &GlobalBasePtr[index >> 18 & 0x3F][index & 0x3FFFF];}
+	bool IsInitialised()const{ return *GlobalBasePtr != NULL; }
 };
