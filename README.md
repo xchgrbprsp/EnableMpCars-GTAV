@@ -7,6 +7,8 @@ Just drop this asi file in your GTA V directory, then make sure you have an asil
 * [OpenIV](http://openiv.com/) - Use the ASI Manager in the tools menu to enable the asi loader
 * [ScriptHookV](http://www.dev-c.com/gtav/scripthookv/)
 
+The Visual studio C++ X86 redistributable 2015 is required to run this plugin. This can be got installed from [Here](https://www.microsoft.com/en-gb/download/details.aspx?id=48145) - make sure you select the vc_redist.X64.exe file on the download screen.
+
 ScriptHookV itself isnt required to use this plugin. 
 
 Also If you dont want to use the asi loader after a game update due to ScriptHookV throwing an error, you can just use a program like Cheat Engine to manually inject this dll once you have started up the game and the features will work as normal. If injecting manually this asi will still need to be in the same directory as GTA V otherwise a fatal error will be thrown crashing GTA V.
