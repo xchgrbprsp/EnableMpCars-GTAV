@@ -176,7 +176,7 @@ void EnableCars::EnableCarsGlobal()
 		}
 		DEBUGMSG("Pattern Found in codepage %d at memory address %llX", i, sigAddress);
 		int RealCodeOff = (int)(sigAddress - (__int64)shopController->GetCodePageAddress(i) + (i << 14));
-		for (int j = 0; j < 400; j++)
+		for (int j = 0; j < 2000; j++)
 		{
 			if (*(int*)shopController->GetCodePositionAddress(RealCodeOff - j) == 0x0008012D)
 			{
